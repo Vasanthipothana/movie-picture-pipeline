@@ -1,3 +1,4 @@
+```yaml
 name: Frontend Continuous Deployment
 
 on:
@@ -66,6 +67,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Build Docker image
         working-directory: starter/frontend
         env:
@@ -83,6 +87,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -103,6 +114,9 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
 
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name cluster --region ${{ secrets.AWS_REGION }}
+
       - name: Update Kubernetes image
         working-directory: starter/frontend/k8s
         env:
@@ -111,4 +125,5 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           kustomize edit set image frontend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          kustomize build | kubectl apply -f -ls
+          kustomize build | kubectl apply -f -
+```

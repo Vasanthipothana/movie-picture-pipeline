@@ -122,7 +122,3 @@ jobs:
         run: |
           kustomize edit set image frontend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           kustomize build | kubectl apply -f -
-
-      - name: Show LoadBalancer URLs
-        run: |
-          kubectl get services

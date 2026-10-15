@@ -31,11 +31,48 @@ jobs:
       - name: Run tests
         run: pipenv run test
 
-  build:
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: codebuild-movie-picture-pipeline-runner-${{ github.run_id }}-${{ github.run_attempt }}
     needs: test
+    env:
+      AWS_REGION: ap-southeast-2
+      ECR_REPOSITORY: mp-backend
+      EKS_CLUSTER: movie-picture-pipeline
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Configure AWS account details
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> "$GITHUB_ENV"
+          echo "ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" >> "$GITHUB_ENV"
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" |
+            docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
       - name: Build backend image
-        run: docker build --tag "mp-backend:${GITHUB_SHA}" ./starter/backend
+        run: |
+          docker build \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
+            ./starter/backend
+
+      - name: Push backend image
+        run: |
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER"
+
+      - name: Deploy backend
+        run: |
+          kubectl set image deployment/backend \
+            backend="$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          kubectl rollout status deployment/backend --timeout=180s

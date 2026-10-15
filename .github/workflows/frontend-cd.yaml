@@ -1,3 +1,4 @@
+
 name: Frontend Continuous Deployment
 
 'on':
@@ -19,16 +20,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: npm
           cache-dependency-path: starter/frontend/package-lock.json
+
       - name: Install dependencies
         run: npm ci
+
       - name: Run lint
         run: npm run lint
+
       - name: Run tests
         run: CI=true npm test -- --watchAll=false
 
@@ -39,6 +44,7 @@ jobs:
       AWS_REGION: ap-southeast-2
       ECR_REPOSITORY: mp-frontend
       EKS_CLUSTER: movie-picture-pipeline
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,9 +56,8 @@ jobs:
           echo "ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" >> "$GITHUB_ENV"
 
       - name: Log in to Amazon ECR
-        run: |
-          aws ecr get-login-password --region "$AWS_REGION" |
-            docker login --username AWS --password-stdin "$ECR_REGISTRY"
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build frontend image
         working-directory: starter/frontend

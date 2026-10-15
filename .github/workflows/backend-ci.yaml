@@ -1,4 +1,3 @@
-
 name: Backend Continuous Integration
 
 on:
@@ -13,7 +12,7 @@ on:
 jobs:
   lint:
     name: Lint Backend
-    runs-on: ubuntu-latest
+    runs-on: codebuild-movie-picture-pipeline-runner-${{ github.run_id }}-${{ github.run_attempt }}
     defaults:
       run:
         working-directory: starter/backend

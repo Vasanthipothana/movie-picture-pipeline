@@ -1,46 +1,82 @@
 name: Frontend Continuous Deployment
 
 'on':
-  push:
-    branches:
-      - main
-    paths:
-      - "starter/frontend/**"
-      - "starter/backend/k8s/**"
-      - ".github/workflows/frontend-cd.yaml"
-  workflow_dispatch:
+push:
+branches:
+- main
+paths:
+- "starter/frontend/"
+- "starter/backend/k8s/"
+- ".github/workflows/frontend-cd.yaml"
+workflow_dispatch:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: starter/frontend
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: npm
-          cache-dependency-path: starter/frontend/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Run lint
-        run: npm run lint
-      - name: Run tests
-        run: CI=true npm test -- --watchAll=false
+test:
+runs-on: ubuntu-latest
+defaults:
+run:
+working-directory: starter/frontend
+steps:
+- name: Checkout repository
+uses: actions/checkout@v4
+- name: Set up Node.js
+uses: actions/setup-node@v4
+with:
+node-version: 18
+cache: npm
+cache-dependency-path: starter/frontend/package-lock.json
+- name: Install dependencies
+run: npm ci
+- name: Run lint
+run: npm run lint
+- name: Run tests
+run: CI=true npm test -- --watchAll=false
 
-  build:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Build frontend image
-        working-directory: starter/frontend
-        env:
-          REACT_APP_MOVIE_API_URL: ${{ vars.BACKEND_API_URL }}
-        run: |
-          docker build --build-arg "REACT_APP_MOVIE_API_URL=${REACT_APP_MOVIE_API_URL}" --tag "mp-frontend:${GITHUB_SHA}" .
+build-and-deploy:
+runs-on: codebuild-movie-picture-pipeline-runner-${{ github.run_id }}-${{ github.run_attempt }}
+needs: test
+env:
+AWS_REGION: ap-southeast-2
+ECR_REPOSITORY: mp-frontend
+EKS_CLUSTER: movie-picture-pipeline
+steps:
+- name: Checkout repository
+uses: actions/checkout@v4
+
+  - name: Configure AWS account details
+    run: |
+      AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> "$GITHUB_ENV"
+      echo "ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" >> "$GITHUB_ENV"
+
+  - name: Log in to Amazon ECR
+    run: |
+      aws ecr get-login-password --region "$AWS_REGION" |
+        docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+  - name: Build frontend image
+    working-directory: starter/frontend
+    env:
+      REACT_APP_MOVIE_API_URL: ${{ vars.BACKEND_API_URL }}
+    run: |
+      docker build \
+        --build-arg "REACT_APP_MOVIE_API_URL=${REACT_APP_MOVIE_API_URL}" \
+        --tag "$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" \
+        --tag "$ECR_REGISTRY/$ECR_REPOSITORY:latest" .
+
+  - name: Push frontend image
+    run: |
+      docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+      docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+  - name: Configure kubectl
+    run: |
+      aws eks update-kubeconfig \
+        --region "$AWS_REGION" \
+        --name "$EKS_CLUSTER"
+
+  - name: Deploy frontend
+    run: |
+      kubectl set image deployment/frontend \
+        frontend="$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+      kubectl rollout status deployment/frontend --timeout=180s

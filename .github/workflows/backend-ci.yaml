@@ -20,13 +20,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+      - name: Check Python environment
+        run: |
+          cat /etc/os-release
+          command -v python || true
+          command -v python3 || true
+          command -v python3.10 || true
+          python3 --version || true
+          python3.10 --version || true
 
       - name: Install Pipenv
-        run: python -m pip install pipenv
+        run: python3 -m pip install pipenv
 
       - name: Install dependencies
         run: pipenv install --dev
@@ -48,7 +52,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          check-latest: true
 
       - name: Install Pipenv
         run: python -m pip install pipenv

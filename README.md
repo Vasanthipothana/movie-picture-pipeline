@@ -406,7 +406,35 @@ kustomize edit set image backend=<ECR_REPO_URL>:<NEW_TAG_HERE>
 # Apply the manifests to the cluster
 kustomize build | kubectl apply -f -
 ```
+## Live Application
 
+The Movie Picture Pipeline application is deployed on Amazon EKS.
+
+- **Frontend Application:** [Open Movie Picture Pipeline](http://a46e15b06ed06448db8a0bfcbff576d6-358058277.ap-southeast-2.elb.amazonaws.com)
+- **Backend API:** [View Movies API](http://a0539db7ad4e54e728ee6a64446c41fb-1837641410.ap-southeast-2.elb.amazonaws.com/movies)
+
+## CI/CD Workflows
+
+This project uses GitHub Actions to automate continuous integration and deployment.
+
+- **Frontend CI:** Runs linting, tests, and the Docker build.
+- **Backend CI:** Runs linting, tests, and the Docker build.
+- **Frontend CD:** Builds and pushes the frontend Docker image to Amazon ECR and deploys it to Amazon EKS.
+- **Backend CD:** Builds and pushes the backend Docker image to Amazon ECR and deploys it to Amazon EKS.
+
+The deployment workflows use Git commit SHA tags to identify application image versions.
+
+## Technologies Used
+
+- React and TypeScript
+- Python and Flask
+- GitHub Actions
+- Docker
+- Amazon ECR
+- Amazon EKS and Kubernetes
+- Kustomize
+  
 ## License
 
 [License](LICENSE.md)
+
